@@ -1,6 +1,9 @@
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
+
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use parity_tokio_ipc::{Endpoint, Connection};
 use serde::{Deserialize, Serialize};
+use std::str;
 
 // todo: можно сделать свой Serialize/Deserialize с делимитером \f
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,23 +38,24 @@ pub struct IpcError {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct IpcStreamResponse {
     #[serde(rename = "type")]
-	_type: String,
-	data: IpcStreamSchema,
+    _type: String,
+    data: IpcStreamWrapper,
 }
 #[derive(Debug, Deserialize, Serialize)]
-pub struct IpcStreamSchema {
+pub struct IpcStreamWrapper {
     id: u64,
-    data: NewBlocksStreamResponse,
+    data: IpcStreamData,
 }
 #[derive(Debug, Deserialize, Serialize)]
-pub struct NewBlocksStreamResponse {
-    bytes: StreamBytes,
-    target: String,
-    miningRequestId: u64,
+pub struct IpcStreamData {
+    bytes: IpcStreamBytes,
+    #[serde(rename = "miningRequestId")]
+    mining_request_id: u64,
     sequence: u64,
+    target: String,
 }
-#[derive(Debug, Deserialize, Serialize)]
-pub struct StreamBytes {
+#[derive(Debug, Deserialize, Serialize, Default)]
+pub struct IpcStreamBytes {
     #[serde(rename = "type")]
     _type: String,
     #[serde(with = "serde_bytes")]
@@ -94,37 +98,38 @@ impl Ipc {
 
         loop {
             // read from socket
-            let mut buf = [0u8; 4096];
+            let mut buf = [0u8; 2048];
             self.conn.read(&mut buf[..]).await.expect("Unable to read buffer");
-            
-            // todo: возможно лишнее и парсить сразу слайс
-            // build json
-            let part = String::from_utf8(buf.to_vec()).unwrap();
-            json.push_str(&part);
 
-            println!("{}", json);
-            let response: IpcStreamResponse = serde_json::from_str(&json).unwrap();
-            println!("{:?}", response);
-            // let stream: IpcStream = match serde_json::from_str(&json) {
-            //     Ok(stream) => stream,
-            //     Err(_) => continue,
-            // };
+            // save chank
+            let s = str::from_utf8(&buf).expect("Found invalid UTF-8");
+            json.push_str(&s);
 
-            callback(IpcStreamResponse{
-                _type: String::from("stream"),
-                data: IpcStreamSchema {
-                    id: 0,
-                    data: NewBlocksStreamResponse {
-                        bytes: StreamBytes {
-                            _type: String::from("Buffer"),
-                            data: vec![0],
-                        },
-                        target: String::from(""),
-                        miningRequestId: 1,
-                        sequence: 1,
-                    }
-                }
-            });
+            // local delimiter
+            let ldelim = '\u{c}';
+
+            // not a complete answer
+            let last_char = json.chars().last().unwrap();
+            if last_char != '\u{0}' && last_char != ldelim {
+                continue;
+            }
+
+            // clear of debris
+            let v: Vec<&str> = json.split(ldelim).collect();
+            println!("\n\nlen: {}\n\n", v[0].len());
+            json = String::from(v[0]);
+
+            let stream: IpcStreamResponse = match serde_json::from_str(&json) {
+                Ok(stream) => stream,
+                Err(_) => {
+                    json = String::new();
+                    continue;
+                },
+            };
+            callback(stream);
+
+            // reset data
+            json = String::new();
         }
     }
 }
