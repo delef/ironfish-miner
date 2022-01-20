@@ -1,19 +1,43 @@
-use tokio::io::{AsyncWriteExt};
-use parity_tokio_ipc::{Endpoint, Connection};
-use serde::{Deserialize, Serialize};
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct IpcStream {
-	id: u64,
-	data: Vec<u8>,
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+// use std::sync::Arc;
+// use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
+
+#[derive(Debug)]
+pub struct Stream<T> {
+    rx: Receiver,
 }
 
-struct Stream {
-    conn: &Connection,
-}
+impl<T> Stream<T> {
+    pub fn new() -> Self {
+        Self {
+            queue: VecDeque::new(),
+            closed: false,
+        }
+    }
 
-impl Stream {
-    pub fn new(conn: &Connection) -> Self {
-        Self {conn: conn}
+    // add task to the stream
+    pub fn write(&mut self, item: T) {
+        if self.closed {
+            return;
+        }
+
+        self.queue.push_back(item);
+    }
+
+    // close the stream
+    pub fn close(&mut self) {
+        self.queue = VecDeque::new();
+        self.closed = true;
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+
+    // get next task from the stream
+    pub fn next(&mut self) -> T {
+        self.queue.pop_front().expect("Can't pop item from Stream")
     }
 }
