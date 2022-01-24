@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use num256::Uint256;
 
-// todo: можно сделать свой Serialize/Deserialize с делимитером \f
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IpcMessage {
     #[serde(rename = "type")]
@@ -45,7 +44,7 @@ pub struct IpcStreamWrapper<T> {
     pub data: T,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NewBlocksResponse {
     pub bytes: NewBlocksBytes,
     #[serde(rename = "miningRequestId")]
@@ -54,7 +53,7 @@ pub struct NewBlocksResponse {
     pub target: Uint256,
 }
 
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct NewBlocksBytes {
     #[serde(rename = "type")]
     pub _type: String,

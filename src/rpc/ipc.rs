@@ -4,7 +4,7 @@ use std::str;
 use std::thread;
 
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Sender;
 use parity_tokio_ipc::{Endpoint, Connection};
 use serde::{Deserialize, Serialize};
 // use futures::executor::block_on;
@@ -17,7 +17,7 @@ const IPC_DELIMITER: char = '\u{c}';
 // #[derive(Debug)]
 pub struct Ipc {
     conn: Connection,
-    message_id: usize,
+    pub message_id: usize,
 }
 
 impl Ipc {
@@ -28,7 +28,7 @@ impl Ipc {
         }
 	}
 
-    pub async fn new_blocks_stream(&mut self, callback: impl Fn(NewBlocksResponse)) {
+    pub async fn new_blocks_stream(&mut self, ch_sender: Sender<NewBlocksResponse>) {
         self.request("miner/newBlocksStream").await;
 
         loop {
@@ -37,11 +37,15 @@ impl Ipc {
                 Ok(result) => result,
                 Err(_) => {
                     println!("invalid json: {}", json);
-                    panic!("Can't parse json");
+                    break;
                 }
             };
 
-            callback(s.data.data);
+            let new_block = s.data.data;
+            if let Err(_) = ch_sender.send(new_block).await {
+				println!("Error: receiver dropped");
+				return;
+			}
         }
     }
 
