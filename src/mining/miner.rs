@@ -1,97 +1,49 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
-
 use std::thread;
-use std::sync::{Arc, Mutex};
-use futures::future::join_all;
-use tokio::sync::mpsc;
+use std::sync::mpsc::Receiver;
+use num_bigint::BigUint;
 
-use rand::Rng;
-use num256::Uint256;
-use blake3;
-
-use super::{mine_header, MineRusult};
+use super::worker_pool::WorkerPool;
 use crate::rpc::types::NewBlocksResponse;
+
+#[derive(Clone, Debug)]
+pub struct MineTask {
+    pub bytes: [u8; 200],
+    pub target: String,
+    pub request_id: u32,
+    pub sequence: u64,
+}
 
 #[derive(Debug)]
 pub struct Miner {
-    threads: u8,
-    batch_size: u64,
-    // hashrate: Meter,
-    randomness: u64,
+    worker_pool: WorkerPool,
 }
 
 impl Miner {
-    pub fn new(threads: u8, batch_size: u64) -> Self {
+    pub fn new(num_threads: usize, batch_size: usize) -> Self {
         Miner {
-            threads: threads,
-            batch_size: batch_size,
-            randomness: 0,
+            worker_pool: WorkerPool::new(num_threads, batch_size),
         }
     }
 
-    pub async fn start(&self, mut ch_receiver: mpsc::Receiver<NewBlocksResponse>) {
-        println!("start mining pool with {} threads.", self.threads);
-
-        while let Some(next_block) = ch_receiver.recv().await {
-            let mut workers = Vec::with_capacity(self.threads as usize);
-
-            // find space
-            let mut rnd = rand::thread_rng();
-            let initial_randomness: u64 = rnd.gen();
-            let randomness = Arc::new(Mutex::<u64>::new(initial_randomness));
-
-            println!("new block. {:?}", next_block);
-
-            for _ in 0..self.threads {
-                let next_block_clone = next_block.clone();
-                let batch_size = self.batch_size;
-
-                // diffrent initials
-                *randomness.lock().unwrap() += batch_size;
-                let randomness = Arc::clone(&randomness);
-                println!("rand: {:?}", initial_randomness);
-
-                workers.push(
-                    thread::spawn(move || {
-                        println!("calculate!");
-                        let result = Self::mine(&next_block_clone, randomness, batch_size);
-
-                        if result.found() {
-                            println!("FOUND BLOCK! {:?}", result);
-                        }
-                    })
-                );
-            }
-
-            for child in workers {
-                let _ = child.join();
-            }
-        }
-    }
-
-    fn mine(next_block: &NewBlocksResponse, randomness: Arc<Mutex<u64>>, batch_size: u64) -> MineRusult {
-        let mut result = MineRusult::empty();
-
+    pub fn start(&self, recv: Receiver<NewBlocksResponse>) {
         loop {
-            if result.found() {
-                break;
+            let new_job = recv.recv().expect("I can't get a new job");
+
+            // target number () convert into bytes
+            let mut target = [0u8; 32];
+            let tbytes = new_job.target.parse::<BigUint>().unwrap().to_bytes_be();
+            if tbytes.len() > target.len() {
+                panic!("target num greater than U256::MAX");
             }
-
-            let mut num = randomness.lock().unwrap();
-
-            result = mine_header(
-                next_block.mining_request_id,
-                &next_block.bytes.data,
-                *num,
-                &next_block.target,
-                batch_size);
-
-            *num += batch_size;
-
-            // нужно выходить из цикла
-            println!("randomless: {}", num)
+            let istart = target.len() - tbytes.len();
+            target[istart..].clone_from_slice(&tbytes);
+                        
+            self.worker_pool.new_job(
+                new_job.bytes.data,
+                target,
+                new_job.mining_request_id,
+                new_job.sequence,
+            );
         }
-    
-        result
     }
 }

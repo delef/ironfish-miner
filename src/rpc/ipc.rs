@@ -1,10 +1,10 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
 
-use std::str;
-use std::thread;
+
+use std::{thread, str, path::Path};
+use std::sync::mpsc::{Sender, Receiver};
 
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use tokio::sync::mpsc::Sender;
 use parity_tokio_ipc::{Endpoint, Connection};
 use serde::{Deserialize, Serialize};
 // use futures::executor::block_on;
@@ -21,7 +21,7 @@ pub struct Ipc {
 }
 
 impl Ipc {
-	pub async fn connect(path: &str) -> Ipc {
+	pub async fn connect<P: AsRef<Path>>(path: P) -> Ipc {
         Self {
             conn: Endpoint::connect(path).await.expect("UnixStram client isn't connected"),
             message_id: 0,
@@ -35,16 +35,12 @@ impl Ipc {
             let json = self.read_json_from_socket().await;
             let s: IpcStreamResponse<NewBlocksResponse> = match serde_json::from_str(&json) {
                 Ok(result) => result,
-                Err(_) => {
-                    println!("invalid json: {}", json);
-                    break;
-                }
+                Err(_) => panic!("invalid json: {}", json),
             };
 
             let new_block = s.data.data;
-            if let Err(_) = ch_sender.send(new_block).await {
-				println!("Error: receiver dropped");
-				return;
+            if let Err(_) = ch_sender.send(new_block) {
+				panic!("Error: new blocks receiver dropped");
 			}
         }
     }

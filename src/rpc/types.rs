@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use num256::Uint256;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IpcMessage {
@@ -50,7 +49,7 @@ pub struct NewBlocksResponse {
     #[serde(rename = "miningRequestId")]
     pub mining_request_id: u32,
     pub sequence: u64,
-    pub target: Uint256,
+    pub target: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
