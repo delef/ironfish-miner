@@ -1,49 +1,40 @@
-use std::thread;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Sender, Receiver};
 use num_bigint::BigUint;
 
-use super::worker_pool::WorkerPool;
-use crate::rpc::types::NewBlocksResponse;
-
-#[derive(Clone, Debug)]
-pub struct MineTask {
-    pub bytes: [u8; 200],
-    pub target: String,
-    pub request_id: u32,
-    pub sequence: u64,
-}
+use super::worker_pool::{WorkerPool, WorkerFound};
+use crate::rpc::types::MinerJob;
 
 #[derive(Debug)]
 pub struct Miner {
-    worker_pool: WorkerPool,
+    num_threads: usize,
+    batch_size: usize,
 }
 
 impl Miner {
     pub fn new(num_threads: usize, batch_size: usize) -> Self {
         Miner {
-            worker_pool: WorkerPool::new(num_threads, batch_size),
+            num_threads: num_threads,
+            batch_size: batch_size,
         }
     }
 
-    pub fn start(&self, recv: Receiver<NewBlocksResponse>) {
-        loop {
-            let new_job = recv.recv().expect("I can't get a new job");
+    pub fn run(&self, job_recv: Receiver<MinerJob>, found_sndr: Sender<WorkerFound>) {
+        let worker_pool = WorkerPool::new(self.num_threads, self.batch_size, found_sndr);
 
-            // target number () convert into bytes
+        loop {
+            let job = job_recv.recv().expect("can't get a new job");
+
+            // target String convert into number bytes
             let mut target = [0u8; 32];
-            let tbytes = new_job.target.parse::<BigUint>().unwrap().to_bytes_be();
+            let tbytes = job.target.parse::<BigUint>().unwrap().to_bytes_be();
             if tbytes.len() > target.len() {
                 panic!("target num greater than U256::MAX");
             }
             let istart = target.len() - tbytes.len();
             target[istart..].clone_from_slice(&tbytes);
-                        
-            self.worker_pool.new_job(
-                new_job.bytes.data,
-                target,
-                new_job.mining_request_id,
-                new_job.sequence,
-            );
+            
+            // send a job to worker threads
+            worker_pool.new_job(job.bytes.data, target, job.mining_request_id, job.sequence);
         }
     }
 }

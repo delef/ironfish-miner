@@ -1,20 +1,13 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
-
-
-use std::{thread, str, path::Path};
-use std::sync::mpsc::{Sender, Receiver};
+use std::{str, path::Path};
+use std::sync::mpsc::Sender;
 
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use parity_tokio_ipc::{Endpoint, Connection};
-use serde::{Deserialize, Serialize};
-// use futures::executor::block_on;
 
-use super::types::{IpcRequest, IpcMessage, IpcStreamResponse, NewBlocksResponse};
-// use super::stream::{Stream};
+use super::types::{IpcRequest, IpcMessage, IpcStreamResponse, MinerJob};
 
 const IPC_DELIMITER: char = '\u{c}';
 
-// #[derive(Debug)]
 pub struct Ipc {
     conn: Connection,
     pub message_id: usize,
@@ -28,12 +21,12 @@ impl Ipc {
         }
 	}
 
-    pub async fn new_blocks_stream(&mut self, ch_sender: Sender<NewBlocksResponse>) {
+    pub async fn new_blocks_stream(&mut self, ch_sender: Sender<MinerJob>) {
         self.request("miner/newBlocksStream").await;
 
         loop {
             let json = self.read_json_from_socket().await;
-            let s: IpcStreamResponse<NewBlocksResponse> = match serde_json::from_str(&json) {
+            let s: IpcStreamResponse<MinerJob> = match serde_json::from_str(&json) {
                 Ok(result) => result,
                 Err(_) => panic!("invalid json: {}", json),
             };
@@ -57,7 +50,7 @@ impl Ipc {
         self.conn.write_all(json.as_bytes()).await.expect("Unable to write message to client");
     }
 
-    // нужно как-то останавливать стрим по запросу и таймауту (если долго нет данных)
+    // todo: add timeout
     async fn read_json_from_socket(&mut self) -> String {
         let mut json = String::new();
 

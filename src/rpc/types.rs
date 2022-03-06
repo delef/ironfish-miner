@@ -43,19 +43,18 @@ pub struct IpcStreamWrapper<T> {
     pub data: T,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct NewBlocksResponse {
-    pub bytes: NewBlocksBytes,
+#[derive(Debug, Clone, Deserialize)]
+pub struct MinerJob {
+    pub bytes: MinerJobBytes,
     #[serde(rename = "miningRequestId")]
     pub mining_request_id: u32,
     pub sequence: u64,
     pub target: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct NewBlocksBytes {
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct MinerJobBytes {
     #[serde(rename = "type")]
     pub _type: String,
-    #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
 }

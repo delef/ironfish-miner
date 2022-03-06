@@ -1,39 +1,46 @@
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports))]
-
 use std::sync::mpsc::channel;
-
+// use std::env;
 use tokio::task;
 
 mod rpc;
-use rpc::{Ipc, types::{NewBlocksResponse, NewBlocksBytes}};
+use rpc::{Ipc, types::MinerJob};
 
 mod mining;
-use mining::Miner;
-
-use tokio::runtime;
+use mining::{Miner, WorkerFound};
 
 #[tokio::main]
 async fn main() {
 	let path = "/Users/delef/Projects/crypto/.ironfish/ironfish.ipc";
 	let mut client = Ipc::connect(path).await;
 	
+	// println!("{:?}", env::args());
+
 	// base config (temporarily hardcode)
 	let threads = 2;
 	let batch_size = 1_000_000;
 
-	// channel
-	let (tasks_sender, tasks_reciver) = channel::<NewBlocksResponse>();
+	// channels
+	let (tasks_sender, tasks_reciver) = channel::<MinerJob>();
+	let (found_sender, found_reciver) = channel::<WorkerFound>();
 
 	// subscribe to node
-	let node_thread = task::spawn(async move {
+	let tnode = task::spawn(async move {
 		client.new_blocks_stream(tasks_sender).await;
 	});
 
 	// miner
-	let mining_thread = task::spawn(async move {
+	let tmining = task::spawn(async move {
 		let miner = Miner::new(threads, batch_size);
-		miner.start(tasks_reciver);
+		miner.run(tasks_reciver, found_sender);
 	});
 
-	let _ = tokio::join!(node_thread, mining_thread);
+	// miner found receiver
+	let tfound = task::spawn(async move {
+		loop {
+			let found = found_reciver.recv();
+			println!("err: {:?}", found);
+		}
+	});
+
+	let _ = tokio::join!(tnode, tmining, tfound);
 }
