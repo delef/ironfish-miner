@@ -1,7 +1,7 @@
 use std::sync::mpsc::{Sender, Receiver};
 use num_bigint::BigUint;
 
-use super::worker_pool::{WorkerPool, WorkerFound};
+use super::worker_pool::{WorkerPool, BlockFound};
 use crate::rpc::types::MinerJob;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ impl Miner {
         }
     }
 
-    pub fn run(&self, job_recv: Receiver<MinerJob>, found_sndr: Sender<WorkerFound>) {
+    pub fn run(&self, job_recv: Receiver<MinerJob>, found_sndr: Sender<BlockFound>) {
         let worker_pool = WorkerPool::new(self.num_threads, self.batch_size, found_sndr);
 
         loop {

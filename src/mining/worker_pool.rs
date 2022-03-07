@@ -18,45 +18,41 @@ pub struct WorkerJobData {
     pub randomness: Arc<AtomicUsize>,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct BlockFound {
+    pub mining_request_id: u32,
+    pub randomness: usize,
+}
+
 #[derive(Debug)]
 enum WorkerCmd {
     Job { job_data: WorkerJobData },
     Stop,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct WorkerFound {
-    mining_request_id: u32,
-    randomness: usize,
-}
-
 #[derive(Debug)]
 pub struct WorkerPool {
-    threads: Vec<thread::JoinHandle<()>>,
-    job_senders: Vec<Sender<WorkerCmd>>,
+    job_channels: Vec<Sender<WorkerCmd>>,
 }
 
 impl WorkerPool {
-    pub fn new(num_threads: usize, batch_size: usize, found_sender: Sender<WorkerFound>) -> WorkerPool {
-        let mut threads: Vec<thread::JoinHandle<()>> = Vec::with_capacity(num_threads);
-        let mut job_senders: Vec<Sender<WorkerCmd>> = Vec::with_capacity(num_threads);
+    pub fn new(num_threads: usize, batch_size: usize, found_sender: Sender<BlockFound>) -> WorkerPool {
+        let mut job_channels: Vec<Sender<WorkerCmd>> = Vec::with_capacity(num_threads);
         
         for thread_id in 0..num_threads {
-            let (jos_sndr, job_rcvr): (Sender<WorkerCmd>, Receiver<WorkerCmd>) = channel();
+            let (job_sndr, job_rcvr) = channel::<WorkerCmd>();
             let found_sndr = found_sender.clone();
 
-            let thread = thread::Builder::new()
+            thread::Builder::new()
                 .name(format!("worker thread {}", thread_id))
                 .spawn(move || worker_thread(job_rcvr, found_sndr, thread_id, batch_size))
                 .expect("worker thread handle");
     
-            threads.push(thread);
-            job_senders.push(jos_sndr);
+            job_channels.push(job_sndr);
         }
     
         WorkerPool {
-            threads: threads,
-            job_senders: job_senders,
+            job_channels: job_channels,
         }
     }
 
@@ -64,7 +60,7 @@ impl WorkerPool {
         let rnd: usize = rand::thread_rng().gen();
         let initial_randomness = Arc::new(AtomicUsize::new(rnd));
 
-        for ch in self.job_senders.iter() {
+        for ch in self.job_channels.iter() {
             ch.send(WorkerCmd::Job {
                 job_data: WorkerJobData {
                     bytes: bytes.clone(),
@@ -80,7 +76,7 @@ impl WorkerPool {
     pub fn stop(&self) {
         info!("stopping workers");
 
-        for tx in self.job_senders.iter() {
+        for tx in self.job_channels.iter() {
             let _ = tx.send(WorkerCmd::Stop);
         }
     }
@@ -88,7 +84,7 @@ impl WorkerPool {
 
 fn worker_thread(
     job_receiver: Receiver<WorkerCmd>,
-    found_sender: Sender<WorkerFound>,
+    found_sender: Sender<BlockFound>,
     thread_id: usize,
     batch_size: usize,
 ) {
@@ -112,13 +108,12 @@ fn worker_thread(
                 &mut job_data.bytes.clone(),
                 &job_data.target,
                 randomness,
-                batch_size,
-            );
+                batch_size);
             
             if let Some(randomness_found) = match_found {
                 info!("found. randomness: {}", randomness_found);
 
-                let _ = found_sender.send(WorkerFound {
+                let _ = found_sender.send(BlockFound {
                     mining_request_id: job_data.mining_request_id,
                     randomness: randomness_found,
                 });

@@ -1,5 +1,5 @@
 mod mine;
-pub use mine::*;
+use mine::*;
 
 mod worker_pool;
 pub use worker_pool::*;

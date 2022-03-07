@@ -291,6 +291,7 @@ dependencies = [
  "futures",
  "log",
  "num-bigint",
+ "num_cpus",
  "parity-tokio-ipc",
  "rand 0.8.4",
  "serde",
