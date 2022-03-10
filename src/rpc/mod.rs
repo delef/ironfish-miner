@@ -1,5 +1,5 @@
-pub mod types;
-pub mod ipc;
 pub mod client;
+pub mod ipc;
+pub mod types;
 
 pub use client::*;

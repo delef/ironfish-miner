@@ -1,4 +1,4 @@
-use crossbeam_channel::{unbounded, Sender, Receiver};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use num_bigint::BigUint;
 
 mod mine;
@@ -36,7 +36,7 @@ impl Miner {
             }
             let istart = target.len() - tbytes.len();
             target[istart..].clone_from_slice(&tbytes);
-            
+
             // send a job to worker threads
             worker_pool.new_job(job.bytes.data, target, job.mining_request_id, job.sequence);
         }

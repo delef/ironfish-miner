@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::Parser;
+use std::path::PathBuf;
 
 const IPC_FILENAME: &'static str = "ironfish.ipc";
 

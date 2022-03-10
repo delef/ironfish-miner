@@ -1,9 +1,9 @@
-use std::path::PathBuf;
 use crossbeam_channel::{Receiver, Sender};
 use std::io::ErrorKind;
+use std::path::PathBuf;
 
 use super::ipc::Ipc;
-use super::types::{StreamResponse, MinerJob};
+use super::types::{MinerJob, StreamResponse};
 use crate::mining::BlockFound;
 
 pub struct Client {
@@ -16,14 +16,17 @@ pub trait ClientVariants {
 
 impl Client {
     pub fn new<A>(args: A) -> Client
-        where A: ClientVariants
+    where
+        A: ClientVariants,
     {
         args.init()
     }
 
     // subscribe to events
     pub fn stream_request(&mut self) {
-        self.adapter.request("miner/newBlocksStream").expect("unable to write message to client");
+        self.adapter
+            .request("miner/newBlocksStream")
+            .expect("unable to write message to client");
     }
 
     pub fn parse_job_from_stream(&mut self, job_sender: &Sender<MinerJob>) {
@@ -32,10 +35,10 @@ impl Client {
             Err(e) => {
                 if e.kind() == ErrorKind::WouldBlock {
                     println!("skiped");
-                    return
+                    return;
                 }
                 panic!("Can't read from soket. Err {}, kind {:?}", e, e.kind());
-            },
+            }
             Ok(v) => v,
         };
 

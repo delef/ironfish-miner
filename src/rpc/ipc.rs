@@ -1,13 +1,6 @@
-use std::{
-    os::unix::net::UnixStream,
-    io::prelude::*,
-    io::Result,
-    str,
-    path::Path,
-    time::Duration,
-};
+use std::{io::prelude::*, io::Result, os::unix::net::UnixStream, path::Path, str, time::Duration};
 
-use super::types::{Request, Message, StreamResponse, MinerJob};
+use super::types::{Message, MinerJob, Request, StreamResponse};
 
 const IPC_DELIMITER: char = '\u{c}';
 const READ_TIMEOUT_SECS: u64 = 1;
@@ -17,23 +10,30 @@ pub struct Ipc {
 }
 
 impl Ipc {
-	pub fn connect<P: AsRef<Path>>(path: P) -> Ipc {
+    pub fn connect<P: AsRef<Path>>(path: P) -> Ipc {
         let socket = UnixStream::connect(path).expect("UnixStram client isn't connected");
-        socket.set_read_timeout(Some(Duration::new(READ_TIMEOUT_SECS, 0))).expect("couldn't set read timeout");
+        socket
+            .set_read_timeout(Some(Duration::new(READ_TIMEOUT_SECS, 0)))
+            .expect("couldn't set read timeout");
 
-        Self {
-            socket: socket,
-        }
-	}
+        Self { socket: socket }
+    }
 
     pub fn request(&mut self, route: &str) -> Result<()> {
-        let req = Request { _type: route.to_string(), mid: 0, data: None };
+        let req = Request {
+            _type: route.to_string(),
+            mid: 0,
+            data: None,
+        };
         self.emit("message", req)?;
         Ok(())
-	}
+    }
 
     pub fn emit(&mut self, name: &str, data: Request) -> Result<()> {
-        let message = Message { _type: name.to_string(), data: data };
+        let message = Message {
+            _type: name.to_string(),
+            data: data,
+        };
         let mut json = serde_json::to_string(&message).unwrap();
         json.push(IPC_DELIMITER);
 
@@ -62,7 +62,7 @@ impl Ipc {
 
             // trim whitespace
             let v: Vec<&str> = json.split(IPC_DELIMITER).collect();
-            
+
             return Ok(String::from(v[0]));
         }
     }

@@ -1,11 +1,11 @@
-use std::thread;
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
-use log::{info};
-use crossbeam_channel::{unbounded, Sender, Receiver, TryRecvError};
+use crossbeam_channel::{unbounded, Receiver, Sender, TryRecvError};
+use log::info;
 use rand::Rng;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+use std::thread;
 
 use super::mine::mine_batch;
 
@@ -36,9 +36,13 @@ pub struct WorkerPool {
 }
 
 impl WorkerPool {
-    pub fn new(num_threads: usize, batch_size: usize, found_sender: Sender<BlockFound>) -> WorkerPool {
+    pub fn new(
+        num_threads: usize,
+        batch_size: usize,
+        found_sender: Sender<BlockFound>,
+    ) -> WorkerPool {
         let mut job_channels: Vec<Sender<WorkerCmd>> = Vec::with_capacity(num_threads);
-        
+
         for thread_id in 0..num_threads {
             let (job_sndr, job_rcvr) = unbounded::<WorkerCmd>();
             let found_sndr = found_sender.clone();
@@ -47,10 +51,10 @@ impl WorkerPool {
                 .name(format!("worker thread {}", thread_id))
                 .spawn(move || worker_thread(job_rcvr, found_sndr, thread_id, batch_size))
                 .expect("worker thread handle");
-    
+
             job_channels.push(job_sndr);
         }
-    
+
         WorkerPool {
             job_channels: job_channels,
         }
@@ -68,8 +72,9 @@ impl WorkerPool {
                     mining_request_id: req_id,
                     sequence: sequence,
                     randomness: initial_randomness.clone(),
-                }
-            }).expect("sending new job command");
+                },
+            })
+            .expect("sending new job command");
         }
     }
 
@@ -96,7 +101,11 @@ fn worker_thread(
                 WorkerCmd::Job { job_data } => job = Some(job_data),
                 WorkerCmd::Stop => break, // stop thread
             },
-            Err(TryRecvError::Empty) => if job.is_none() { continue },
+            Err(TryRecvError::Empty) => {
+                if job.is_none() {
+                    continue;
+                }
+            }
             Err(TryRecvError::Disconnected) => panic!("job channel was dropped"),
         };
 
@@ -108,8 +117,9 @@ fn worker_thread(
                 &mut job_data.bytes.clone(),
                 &job_data.target,
                 randomness,
-                batch_size);
-            
+                batch_size,
+            );
+
             if let Some(randomness_found) = match_found {
                 info!("found. randomness: {}", randomness_found);
 

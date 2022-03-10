@@ -13,24 +13,24 @@ pub struct Message {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Request {
-	pub mid: usize,
-	#[serde(rename = "type")]
-	pub _type: String,
+    pub mid: usize,
+    #[serde(rename = "type")]
+    pub _type: String,
     #[serde(skip)] // временно скипаю т.к. с ним не работает
-	pub data: Option<Vec<u8>>,
+    pub data: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
-	pub id: u64,
-	pub status: String,
-	pub data: Vec<u8>,
+    pub id: u64,
+    pub status: String,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Error {
-	pub code: String,
-	pub message: String,
+    pub code: String,
+    pub message: String,
     pub stack: String,
 }
 
@@ -38,7 +38,7 @@ pub struct Error {
 pub struct StreamResponse<T> {
     #[serde(rename = "type")]
     pub _type: String,
-    pub data: StreamWrapper::<T>,
+    pub data: StreamWrapper<T>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -46,7 +46,6 @@ pub struct StreamWrapper<T> {
     pub id: u64,
     pub data: T,
 }
-
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MinerJobBytes {
