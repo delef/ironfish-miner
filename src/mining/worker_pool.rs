@@ -2,9 +2,9 @@ use std::thread;
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
-    mpsc::{channel, Sender, Receiver, TryRecvError},
 };
 use log::{info};
+use crossbeam_channel::{unbounded, Sender, Receiver, TryRecvError};
 use rand::Rng;
 
 use super::mine::mine_batch;
@@ -40,7 +40,7 @@ impl WorkerPool {
         let mut job_channels: Vec<Sender<WorkerCmd>> = Vec::with_capacity(num_threads);
         
         for thread_id in 0..num_threads {
-            let (job_sndr, job_rcvr) = channel::<WorkerCmd>();
+            let (job_sndr, job_rcvr) = unbounded::<WorkerCmd>();
             let found_sndr = found_sender.clone();
 
             thread::Builder::new()

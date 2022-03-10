@@ -1,4 +1,5 @@
 pub mod types;
+pub mod ipc;
+pub mod client;
 
-mod ipc;
-pub use ipc::*;
+pub use client::*;
