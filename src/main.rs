@@ -1,9 +1,10 @@
 use clap::Parser;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::unbounded;
 use futures::future::join_all;
 use log;
+use std::time::Duration;
+use tokio::{task, time::sleep};
 use num_cpus;
-use tokio::task;
 
 mod rpc;
 use rpc::{types::MinerJob, Client};
@@ -16,6 +17,9 @@ use cli::Cli;
 
 #[tokio::main]
 async fn main() {
+    // init logger
+    env_logger::init();
+
     // init cli
     let config = Cli::parse();
 
@@ -33,21 +37,20 @@ async fn main() {
         client.stream_request();
 
         loop {
-            client.parse_job_from_stream(&job_sender);
-            client.found_handler(&found_reciver);
+            client.send_mining_solution(&found_reciver);
+            client.get_job(&job_sender);
+
+            // 10 checks per second
+            sleep(Duration::from_millis(100)).await;
         }
     }));
 
     // miner thread
-    let num_threads = if config.threads > 0 {
-        config.threads as usize
-    } else {
-        num_cpus::get()
-    };
+    let num_threads = if config.threads > 0 { config.threads as usize } else { num_cpus::get() };
     let batch_size = config.batch_size;
     handles.push(task::spawn(async move {
         log::info!(
-            "Start miner with number of threads: {} and batch size = {}",
+            "Starting to mine with {} threads, batch size: {}",
             num_threads,
             batch_size
         );

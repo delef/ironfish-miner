@@ -1,9 +1,11 @@
-use std::{io::prelude::*, io::Result, os::unix::net::UnixStream, path::Path, str, time::Duration};
+use std::io::{prelude::*, Result};
+use std::os::unix::net::UnixStream;
+use std::path::Path;
+use std::str;
 
-use super::types::{Message, MinerJob, Request, StreamResponse};
+use super::types::{Message, Request};
 
 const IPC_DELIMITER: char = '\u{c}';
-const READ_TIMEOUT_SECS: u64 = 1;
 
 pub struct Ipc {
     socket: UnixStream,
@@ -12,11 +14,9 @@ pub struct Ipc {
 impl Ipc {
     pub fn connect<P: AsRef<Path>>(path: P) -> Ipc {
         let socket = UnixStream::connect(path).expect("UnixStram client isn't connected");
-        socket
-            .set_read_timeout(Some(Duration::new(READ_TIMEOUT_SECS, 0)))
-            .expect("couldn't set read timeout");
+        socket.set_nonblocking(true).expect("couldn't set nonblocking");
 
-        Self { socket: socket }
+        Self { socket }
     }
 
     pub fn request(&mut self, route: &str) -> Result<()> {
@@ -42,12 +42,12 @@ impl Ipc {
     }
 
     // todo: add timeout
-    pub fn read_json_response(&mut self) -> Result<String> {
+    pub fn read_json(&mut self) -> Result<String> {
         let mut json = String::new();
 
         loop {
-            // read from socket
-            let mut buf = [0u8; 2048];
+            // non-blocking read from socket
+            let mut buf = [0u8; 4096];
             self.socket.read(&mut buf[..])?;
 
             // save chank

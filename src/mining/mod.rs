@@ -1,4 +1,4 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use num_bigint::BigUint;
 
 mod mine;
@@ -16,10 +16,7 @@ pub struct Miner {
 
 impl Miner {
     pub fn new(num_threads: usize, batch_size: usize) -> Self {
-        Miner {
-            num_threads: num_threads,
-            batch_size: batch_size,
-        }
+        Self { num_threads, batch_size }
     }
 
     pub fn run(&self, job_recv: Receiver<MinerJob>, found_sndr: Sender<BlockFound>) {

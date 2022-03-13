@@ -78,11 +78,12 @@ impl WorkerPool {
         }
     }
 
+    #[allow(unused)]
     pub fn stop(&self) {
         info!("stopping workers");
 
         for tx in self.job_channels.iter() {
-            let _ = tx.send(WorkerCmd::Stop);
+            tx.send(WorkerCmd::Stop).expect("job_channel receiver dropped");
         }
     }
 }
@@ -123,10 +124,10 @@ fn worker_thread(
             if let Some(randomness_found) = match_found {
                 info!("found. randomness: {}", randomness_found);
 
-                let _ = found_sender.send(BlockFound {
+                found_sender.send(BlockFound {
                     mining_request_id: job_data.mining_request_id,
                     randomness: randomness_found,
-                });
+                }).expect("block found receiver dropped");
             }
         }
     }
