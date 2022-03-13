@@ -1,4 +1,4 @@
-use std::io::{prelude::*, Result};
+use std::io::{prelude::*, Result, Error, ErrorKind};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::str;
@@ -45,25 +45,23 @@ impl Ipc {
     pub fn read_json(&mut self) -> Result<String> {
         let mut json = String::new();
 
-        loop {
-            // non-blocking read from socket
-            let mut buf = [0u8; 4096];
-            self.socket.read(&mut buf[..])?;
+        // non-blocking read from socket
+        let mut buf = [0u8; 4096];
+        self.socket.read(&mut buf[..])?;
 
-            // save chank
-            let s = str::from_utf8(&buf).expect("invalid UTF-8");
-            json.push_str(&s);
+        // save chank
+        let s = str::from_utf8(&buf).expect("invalid UTF-8");
+        json.push_str(&s);
 
-            // not a complete answer
-            let last_char = json.chars().last().unwrap();
-            if last_char != '\u{0}' && last_char != IPC_DELIMITER {
-                continue;
-            }
-
-            // trim whitespace
-            let v: Vec<&str> = json.split(IPC_DELIMITER).collect();
-
-            return Ok(String::from(v[0]));
+        // not a complete answer
+        let last_char = json.chars().last().unwrap();
+        if last_char != '\u{0}' && last_char != IPC_DELIMITER {
+            return Err(Error::new(ErrorKind::OutOfMemory, "buffer overflow"));
         }
+
+        // trim whitespace
+        let v: Vec<&str> = json.split(IPC_DELIMITER).collect();
+
+        return Ok(String::from(v[0]));
     }
 }
