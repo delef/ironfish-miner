@@ -43,15 +43,12 @@ impl Ipc {
 
     // todo: add timeout
     pub fn read_json(&mut self) -> Result<String> {
-        let mut json = String::new();
-
         // non-blocking read from socket
         let mut buf = [0u8; 4096];
         self.socket.read(&mut buf[..])?;
 
-        // save chank
-        let s = str::from_utf8(&buf).expect("invalid UTF-8");
-        json.push_str(&s);
+        // JSON is a UTF-8 string
+        let json = str::from_utf8(&buf).expect("invalid UTF-8");
 
         // not a complete answer
         let last_char = json.chars().last().unwrap();
