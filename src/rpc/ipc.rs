@@ -1,7 +1,9 @@
-use std::io::{prelude::*, Result, Error, ErrorKind};
+use std::io::{prelude::*, Error, ErrorKind, Result};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::str;
+
+use serde::Serialize;
 
 use super::types::{Message, Request};
 
@@ -14,23 +16,25 @@ pub struct Ipc {
 impl Ipc {
     pub fn connect<P: AsRef<Path>>(path: P) -> Ipc {
         let socket = UnixStream::connect(path).expect("UnixStram client isn't connected");
-        socket.set_nonblocking(true).expect("couldn't set nonblocking");
+        socket
+            .set_nonblocking(true)
+            .expect("couldn't set nonblocking");
 
         Self { socket }
     }
 
-    pub fn request(&mut self, route: &str) -> Result<()> {
-        let req = Request {
+    pub fn request<T: Serialize>(&mut self, route: &str, data: T) -> Result<()> {
+        let req = Request::<T> {
             _type: route.to_string(),
             mid: 0,
-            data: None,
+            data: data,
         };
         self.emit("message", req)?;
         Ok(())
     }
 
-    pub fn emit(&mut self, name: &str, data: Request) -> Result<()> {
-        let message = Message {
+    pub fn emit<T: Serialize>(&mut self, name: &str, data: Request<T>) -> Result<()> {
+        let message = Message::<T> {
             _type: name.to_string(),
             data: data,
         };
@@ -59,6 +63,6 @@ impl Ipc {
         // trim whitespace
         let v: Vec<&str> = json.split(IPC_DELIMITER).collect();
 
-        return Ok(String::from(v[0]));
+        return Ok(v[0].to_string());
     }
 }

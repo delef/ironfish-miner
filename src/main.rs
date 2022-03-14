@@ -2,9 +2,9 @@ use clap::Parser;
 use crossbeam_channel::unbounded;
 use futures::future::join_all;
 use log;
+use num_cpus;
 use std::time::Duration;
 use tokio::{task, time::sleep};
-use num_cpus;
 
 mod rpc;
 use rpc::{types::MinerJob, Client};
@@ -34,19 +34,23 @@ async fn main() {
     let ipc_path = config.ipc_path();
     handles.push(task::spawn(async move {
         let mut client = Client::new(ipc_path);
-        client.stream_request();
+        client.stream_request().unwrap();
 
         loop {
-            client.send_mining_solution(&found_reciver);
-            client.get_job(&job_sender);
+            client.send_mining_solution(&found_reciver).unwrap();
+            client.get_job(&job_sender).unwrap();
 
-            // 10 checks per second
-            sleep(Duration::from_millis(100)).await;
+            // 200 checks per second
+            sleep(Duration::from_millis(5)).await;
         }
     }));
 
     // miner thread
-    let num_threads = if config.threads > 0 { config.threads as usize } else { num_cpus::get() };
+    let num_threads = if config.threads > 0 {
+        config.threads as usize
+    } else {
+        num_cpus::get()
+    };
     let batch_size = config.batch_size;
     handles.push(task::spawn(async move {
         log::info!(
