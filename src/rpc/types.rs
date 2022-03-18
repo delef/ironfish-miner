@@ -1,16 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-// #[derive]
-// pub trait RpcRequest: Serialize {}
-// pub trait RpcResponse<'de>: Deserialize<'de> {}
-
 #[derive(Debug, Serialize)]
 pub struct Message<T>
 where
     T: Serialize,
 {
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
     pub data: Request<T>, // пока не дженерик
 }
 
@@ -21,7 +17,7 @@ where
 {
     pub mid: usize,
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
     #[serde(skip)] // временно скипаю т.к. с ним не работает
     pub data: T,
 }
@@ -43,7 +39,7 @@ pub struct Error {
 #[derive(Debug, Deserialize)]
 pub struct StreamResponse<T> {
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
     pub data: StreamWrapper<T>,
 }
 
@@ -56,7 +52,7 @@ pub struct StreamWrapper<T> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct MinerJobBytes {
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
     pub data: Vec<u8>,
 }
 

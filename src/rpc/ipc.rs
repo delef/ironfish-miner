@@ -25,7 +25,7 @@ impl Ipc {
 
     pub fn request<T: Serialize>(&mut self, route: &str, data: T) -> Result<()> {
         let req = Request::<T> {
-            _type: route.to_string(),
+            r#type: route.to_string(),
             mid: 0,
             data: data,
         };
@@ -35,7 +35,7 @@ impl Ipc {
 
     pub fn emit<T: Serialize>(&mut self, name: &str, data: Request<T>) -> Result<()> {
         let message = Message::<T> {
-            _type: name.to_string(),
+            r#type: name.to_string(),
             data: data,
         };
         let mut json = serde_json::to_string(&message).unwrap();

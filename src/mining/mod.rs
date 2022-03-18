@@ -16,11 +16,20 @@ pub struct Miner {
 
 impl Miner {
     pub fn new(num_threads: usize, batch_size: usize) -> Self {
-        Self { num_threads, batch_size }
+        Self {
+            num_threads,
+            batch_size,
+        }
     }
 
-    pub fn run(&self, job_recv: Receiver<MinerJob>, found_sndr: Sender<BlockFound>) {
-        let worker_pool = WorkerPool::new(self.num_threads, self.batch_size, found_sndr);
+    pub fn run(
+        &self,
+        job_recv: Receiver<MinerJob>,
+        found_sndr: Sender<BlockFound>,
+        metric_sndr: Sender<usize>,
+    ) {
+        let worker_pool =
+            WorkerPool::new(self.num_threads, self.batch_size, found_sndr, metric_sndr);
 
         loop {
             let job = job_recv.recv().expect("can't get a new job");

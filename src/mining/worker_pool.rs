@@ -40,16 +40,18 @@ impl WorkerPool {
         num_threads: usize,
         batch_size: usize,
         found_sender: Sender<BlockFound>,
+        metric_sender: Sender<usize>,
     ) -> WorkerPool {
         let mut job_channels: Vec<Sender<WorkerCmd>> = Vec::with_capacity(num_threads);
 
-        for thread_id in 0..num_threads {
+        for _thread_id in 0..num_threads {
             let (job_sndr, job_rcvr) = unbounded::<WorkerCmd>();
             let found_sndr = found_sender.clone();
+            let metric_sndr = metric_sender.clone();
 
             thread::Builder::new()
-                .name(format!("worker thread {}", thread_id))
-                .spawn(move || worker_thread(job_rcvr, found_sndr, thread_id, batch_size))
+                .name(format!("worker pool thread"))
+                .spawn(move || worker_thread(job_rcvr, found_sndr, metric_sndr, batch_size))
                 .expect("worker thread handle");
 
             job_channels.push(job_sndr);
@@ -83,7 +85,8 @@ impl WorkerPool {
         info!("stopping workers");
 
         for tx in self.job_channels.iter() {
-            tx.send(WorkerCmd::Stop).expect("job_channel receiver dropped");
+            tx.send(WorkerCmd::Stop)
+                .expect("job_channel receiver dropped");
         }
     }
 }
@@ -91,10 +94,13 @@ impl WorkerPool {
 fn worker_thread(
     job_receiver: Receiver<WorkerCmd>,
     found_sender: Sender<BlockFound>,
-    thread_id: usize,
+    metric_sender: Sender<usize>,
     batch_size: usize,
 ) {
+    let thread_id = thread::current().id();
     let mut job: Option<WorkerJobData> = None;
+
+    info!("Worker thread started. Thread ID: {:?}", thread_id);
 
     loop {
         match job_receiver.try_recv() {
@@ -120,17 +126,20 @@ fn worker_thread(
                 randomness,
                 batch_size,
             );
+            metric_sender.send(batch_size).unwrap();
 
             if let Some(randomness_found) = match_found {
                 info!("found. randomness: {}", randomness_found);
 
-                found_sender.send(BlockFound {
-                    mining_request_id: job_data.mining_request_id,
-                    randomness: randomness_found,
-                }).expect("block found receiver dropped");
+                found_sender
+                    .send(BlockFound {
+                        mining_request_id: job_data.mining_request_id,
+                        randomness: randomness_found,
+                    })
+                    .expect("block found receiver dropped");
             }
         }
     }
 
-    info!("Worker thread stopped. Thread ID: {}", thread_id);
+    info!("Worker thread stopped. Thread ID: {:?}", thread_id);
 }

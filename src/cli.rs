@@ -16,7 +16,7 @@ pub struct Cli {
     pub threads: isize,
 
     /// Batch size
-    #[clap(short, long, default_value_t = 1_000_000)]
+    #[clap(short, long, default_value_t = 100_000)]
     pub batch_size: usize,
 }
 
