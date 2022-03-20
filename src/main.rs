@@ -32,7 +32,7 @@ async fn main() {
     let (metric_sender, metric_reciver) = unbounded::<usize>();
 
     // handles
-    let mut handles: Vec<task::JoinHandle<()>> = Vec::with_capacity(2);
+    let mut handles: Vec<task::JoinHandle<()>> = Vec::with_capacity(3);
 
     // node subscriber
     let ipc_path = config.ipc_path();
